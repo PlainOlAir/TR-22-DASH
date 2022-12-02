@@ -6,13 +6,14 @@
 
    Temp (F)     -> F
    RPM (#)      -> #
-   Oil P(psi)   -> psi
-   Fuel P(psi)  -> psi
+   Oil P(psi)   -> psi ??
+   Fuel P(psi)  -> psi ??
 */
 
 /*
    To-do:
    Make screen more general so arduino code only needs to be adjusted
+   Find default units from PDM to update code and nextion
 */
 
 //CANbus setup
@@ -29,17 +30,11 @@ const int rpm_min = 1000;
 const int rpm_rng = rpm_max - rpm_min;
 const int rpm_step = (rpm_rng) / NUMPIXELS;
 
-//Warning stuff
-int warnt = 0;
-int warnfp = 0;
-int warnop = 0;
-int warnbatt = 0;
-
 //Data values
 int rpm = 0;    //#
 int t = 0;      //F
-int fp = 0;     //bar
-int op = 0;     //bar
+int fp = 0;     //dpsi
+int op = 0;     //dpsi
 int batt = 0;   //dV
 
 int modeTC = 0; //#
@@ -49,8 +44,8 @@ int killsw = 0; //#
 
 //Warning values
 int t_max = 212;    //F
-int fp_low = 210;   //cbar
-int op_low = 250;   //cbar
+int fp_low = 210;   //dpsi
+int op_low = 210;   //dpsi
 int batt_low = 120; //dV
 
 //Warning logic
@@ -68,16 +63,13 @@ int button_depress = 500;
 
 //General setup
 String endChar = String(char(0xff)) + String(char(0xff)) + String(char(0xff));
-
 String page = "boot";
 String lastpage = "";
 int i = 0;
 int killsw_temp = 0;
-
 int starttime = millis();
 const int logotime = 6000;
 
-//program when find kill switch logic
 static void off_LED() {
   if ((millis() / 1000) % 2 == 0) {
     for (int i = 0; i < 15; i++) {
@@ -142,6 +134,7 @@ void setup() {
     continue;
   }
   Serial1.print("page important" + endChar);
+  Serial1.print("hight.val=" + String(hight) + endChar + "lowfp.val=" + String(lowfp) + endChar + "lowfp.val=" + String(lowfp) + endChar + "lowbatt.val=" + String(lowbatt) + endChar);
   page = "important";
 }
 
@@ -155,6 +148,7 @@ void loop() {
 
   ret = can.readMsgBuf(&id, &len, buf);
 
+  //Get CAN data
   if (ret == CAN_OK) {
     switch (id) {
       case 0x50:
@@ -174,6 +168,7 @@ void loop() {
     }
   }
 
+  //Update values in each page
   if (page == "important") {
     Serial1.print("ecut.val=" + String(t) + endChar);
     Serial1.print("ecubatt.val=" + String(batt) + endChar);
@@ -190,7 +185,6 @@ void loop() {
     Serial1.print("rpmbar.val=" + String(int(float((rpm - rpm_min)) / rpm_rng * 100)) + endChar);
   }
 
-  //Update screen
   //Warnings
   if (page == "race" && !warning) {
     if (t > t_max && millis() - twarntime > warning_sleep) {
@@ -252,9 +246,11 @@ void loop() {
       Serial1.print("page " + lastpage);
     }
     Serial1.print(endChar);
+    if(page == "important"){
+      Serial1.print("hight.val=" + String(hight) + endChar + "lowfp.val=" + String(lowfp) + endChar + "lowfp.val=" + String(lowfp) + endChar + "lowbatt.val=" + String(lowbatt) + endChar);
+    }
   }
 
-  //Visuals
   //Car state
   if (page == "important") {
     if (killsw == 0 && killsw_temp != 0) {
@@ -266,6 +262,7 @@ void loop() {
     }
   }
 
+  //LEDs
   if (killsw == 0) {
     off_LED();
   } else if (killsw != 0) {
