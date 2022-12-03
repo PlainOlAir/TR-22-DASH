@@ -1,8 +1,8 @@
 /*
-   0x50 - Temp[01]    Lap #[23]   Sats #[45]    Odometer[67]
-   0x51 - Kill Sw[01] Volt[23]    Lap Time[4567]
-   0x52 - Oil P[01]   Fuel P[23]  TC[45]        ECU Mode[67]
-   0x53 - RPM[01]
+   0x50 - Temp[01]    GPS Speed[23]   Best Time[4567]
+   0x51 - Kill Sw[01] Volt[23]        TC[45]          ECU Mode[67]
+   0x52 - Oil P[01]   Fuel P[23]      LatAcc[45]      LonAcc[67]
+   0x53 - RPM[01]     Wheel Slip[23]  Lap Time[4567]
 
    Temp (F)     -> F
    RPM (#)      -> #
@@ -43,9 +43,9 @@ int whlslp = 0; //km/h
 int killsw = 0; //#
 
 //Warning values
-int t_max = 212;    //F
-int fp_low = 210;   //dpsi
-int op_low = 210;   //dpsi
+int t_high = 2120;    //F
+int fp_low = 350;   //dpsi
+int op_low = 100;   //dpsi
 int batt_low = 120; //dV
 
 //Warning logic
@@ -68,7 +68,7 @@ String lastpage = "";
 int i = 0;
 int killsw_temp = 0;
 int starttime = millis();
-const int logotime = 6000;
+const int logotime = 7000;
 
 static void off_LED() {
   if ((millis() / 1000) % 2 == 0) {
@@ -84,7 +84,7 @@ static void off_LED() {
 }
 
 static void warning_LED() {
-
+  
 }
 
 static void tach_LED(int rev) {
@@ -134,7 +134,8 @@ void setup() {
     continue;
   }
   Serial1.print("page important" + endChar);
-  Serial1.print("hight.val=" + String(hight) + endChar + "lowfp.val=" + String(lowfp) + endChar + "lowfp.val=" + String(lowfp) + endChar + "lowbatt.val=" + String(lowbatt) + endChar);
+  delay(100);
+  Serial1.print("hight.val=" + String(t_high) + endChar + "lowfp.val=" + String(fp_low) + endChar + "lowop.val=" + String(op_low) + endChar + "lowbatt.val=" + String(batt_low) + endChar);
   page = "important";
 }
 
@@ -145,7 +146,7 @@ void loop() {
   uint8_t len;
   uint8_t buf[8];
   uint8_t i;
-
+  
   ret = can.readMsgBuf(&id, &len, buf);
 
   //Get CAN data
@@ -186,30 +187,38 @@ void loop() {
   }
 
   //Warnings
-  if (page == "race" && !warning) {
-    if (t > t_max && millis() - twarntime > warning_sleep) {
+  if (page == "race" && !warning && rpm > 750) {
+    if (t > t_high && millis() - twarntime > warning_sleep) {
       warning = true;
+      lastpage = page;
       page = "hight";
       Serial1.print("page hight");
     } else if (fp < fp_low && millis() - fpwarntime > warning_sleep) {
       warning = true;
+      lastpage = page;
       page = "lowfp";
       Serial1.print("page lowfp");
 
     } else if (op < op_low && millis() - opwarntime > warning_sleep) {
       warning = true;
+      lastpage = page;
       page = "lowop";
       Serial1.print("page lowop");
 
     } else if (batt < batt_low && millis() - battwarntime > warning_sleep) {
       warning = true;
+      lastpage = page;
       page = "lowbatt";
       Serial1.print("page lowbatt");
+    }
+    if(warning){
+      Serial1.print(endChar);
+      delay(100);
     }
   }
 
   //Screen switch/Ack
-  if (analogRead(A2) == 516 && millis() - button_time > button_depress) {
+  if (analogRead(A2) >= 700 && millis() - button_time > button_depress) {
     button_time = millis();
 
     if (page == "important") {
@@ -246,8 +255,9 @@ void loop() {
       Serial1.print("page " + lastpage);
     }
     Serial1.print(endChar);
+    delay(100);
     if(page == "important"){
-      Serial1.print("hight.val=" + String(hight) + endChar + "lowfp.val=" + String(lowfp) + endChar + "lowfp.val=" + String(lowfp) + endChar + "lowbatt.val=" + String(lowbatt) + endChar);
+      Serial1.print("hight.val=" + String(t_high) + endChar + "lowfp.val=" + String(fp_low) + endChar + "lowop.val=" + String(op_low) + endChar + "lowbatt.val=" + String(batt_low) + endChar);
     }
   }
 
