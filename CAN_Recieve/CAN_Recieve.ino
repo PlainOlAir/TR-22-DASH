@@ -73,7 +73,7 @@ int starttime = millis();
 const int logotime = 7000;
 
 static void off_LED() {
-  if (millis() % 1000 > 500) {
+  if (millis() % 1500 > 750) {
     for (int i = 0; i < NUMPIXELS; i++) {
       pixels.setPixelColor(i, pixels.Color(0, 0, 0));
     }
@@ -93,19 +93,13 @@ static void tc_LED() {
 }
 
 static void clutch_LED() {
-  int current_step = floor( (millis() % 1000) / (1000/7));
+  int current_step = floor( (millis() % 700) / (700/7));
 
   for (int i = 0; i < NUMPIXELS; i++) {
     pixels.setPixelColor(i, pixels.Color(0, 0, 0));
-
-    if (i == current_step) {
-      pixels.setPixelColor(i, pixels.Color(255, 0, 0));
-      pixels.setPixelColor(NUMPIXELS - (i-1), pixels.Color(255, 0, 0));
-    }
-
   }
-
-
+  pixels.setPixelColor(current_step, pixels.Color(255, 0, 0));
+  pixels.setPixelColor(NUMPIXELS - (current_step + 1), pixels.Color(255, 0, 0));
   pixels.show();
 }
 
