@@ -1,8 +1,8 @@
 /*
-   0x50 - Temp[01]    GPS Speed[23]   Best Time[4567]
-   0x51 - Kill Sw[01] Volt[23]        TC[45]          ECU Mode[67]
-   0x52 - Oil P[01]   Fuel P[23]      LatAcc[45]      LonAcc[67]
-   0x53 - RPM[01]     Wheel Slip[23]  Lap Time[4567]
+   0x50 - Temp[01]    GPS Speed[23]   Lap Time[4567]
+   0x51 - Kill Sw[01] Volt[23]        N/O[4567]
+   0x52 - Oil P[01]   Fuel P[23]      N/O[4567]
+   0x53 - RPM[01]     Wheel Slip[23]  TC[45]          Clutch[67]
 
    Temp (F)     -> F
    RPM (#)      -> #
@@ -36,7 +36,8 @@ int t = 0;      //F
 int fp = 0;     //dpsi
 int op = 0;     //dpsi
 int batt = 0;   //dV
-int tc = 0;
+int tc = 0;     //#
+int clutch = 0; //#
 
 int modeTC = 0; //#
 int whlslp = 0; //km/h
@@ -72,26 +73,39 @@ int starttime = millis();
 const int logotime = 7000;
 
 static void off_LED() {
-  if ((millis() / 1000) % 2 == 0) {
-    for (int i = 0; i < 15; i++) {
+  if (millis() % 1000 > 500) {
+    for (int i = 0; i < NUMPIXELS; i++) {
       pixels.setPixelColor(i, pixels.Color(0, 0, 0));
     }
   } else {
-    for (int i = 0; i < 15; i++) {
+    for (int i = 0; i < NUMPIXELS; i++) {
       pixels.setPixelColor(i, pixels.Color(255, 255, 0));
     }
   }
   pixels.show();
 }
 
-static void warning_LED() {
+static void tc_LED() {
   for (int i = 0; i < NUMPIXELS; i++) {
-    if (millis() % 200 > 100) {
-      pixels.setPixelColor(i, pixels.Color(255, 0, 0))
-    } else {
-      pixels.setPixelColor(i, pixels.Color(0, 0, 0))
-    }
+    pixels.setPixelColor(i, pixels.Color(0, 0, 255));
   }
+  pixels.show();
+}
+
+static void clutch_LED() {
+  int current_step = floor( (millis() % 1000) / (1000/7));
+
+  for (int i = 0; i < NUMPIXELS; i++) {
+    pixels.setPixelColor(i, pixels.Color(0, 0, 0));
+
+    if (i == current_step) {
+      pixels.setPixelColor(i, pixels.Color(255, 0, 0));
+      pixels.setPixelColor(NUMPIXELS - (i-1), pixels.Color(255, 0, 0));
+    }
+
+  }
+
+
   pixels.show();
 }
 
@@ -99,17 +113,20 @@ static void tach_LED(int rev) {
   int current_step = (max(rpm_min, rev) - rpm_min) / rpm_step;
 
   //Above limit
+
   if (rev > rpm_max) {
-    for (int i = 0; i < NUMPIXELS; i++) {
-      if (millis() % 100 > 50) {
+    if (millis() % 100 > 50) {
+      for (int i = 0; i < NUMPIXELS; i++) {
         pixels.setPixelColor(i, pixels.Color(255, 0, 0));
-      } else {
+      }
+    } else {
+      for (int i = 0; i < NUMPIXELS; i++) {
         pixels.setPixelColor(i, pixels.Color(0, 0, 255));
       }
     }
-
+    
     //Below limit
-  } else {
+  } else {  
     for (i = 0; i < NUMPIXELS; i++) {
       if (i < current_step) {
         if (i < 8) {
@@ -120,17 +137,6 @@ static void tach_LED(int rev) {
       } else {
         pixels.setPixelColor(i, pixels.Color(0, 0, 0));
       }
-    }
-  }
-  pixels.show();
-}
-
-static void tc_LED() {
-  for (int i = 0; i < NUMPIXELS; i++) {
-    if (millis() % 100 > 50) {
-      pixels.setPixelColor(i, pixels.Color(0, 255, 0))
-    } else {
-      pixels.setPixelColor(i, pixels.Color(0, 0, 0))
     }
   }
   pixels.show();
@@ -184,7 +190,8 @@ void loop() {
         break;
       case 0x53:
         rpm = (buf[1] * 256 + buf[0]);
-        tc = 0
+        tc = (buf[5] * 256 + buf[4]);
+        clutch = (buf[7] * 256 + buf[6]);
         break;
     }
   }
@@ -203,7 +210,19 @@ void loop() {
     Serial1.print("ecuop.val=" + String(op) + endChar);
     Serial1.print("ecufp.val=" + String(fp) + endChar);
     Serial1.print("rpm.val=" + String(rpm) + endChar);
-    Serial1.print("rpmbar.val=" + String(int(float((rpm - rpm_min)) / rpm_rng * 100)) + endChar);
+    
+    if (tc != 0) {
+      Serial1.print("t5.bco=8160" + endChar + "t5.pco=63515" + endChar);
+    } else {
+      Serial1.print("t5.bco=0" + endChar + "t5.pco=65535" + endChar);
+    }
+
+    if (clutch != 0) {
+      Serial1.print("t6.bco=8160" + endChar + "t6.pco=63515" + endChar);
+    } else {
+      Serial1.print("t6.bco=0" + endChar + "t6.pco=65535" + endChar);      
+    }
+
   }
 
   //Warnings
@@ -283,12 +302,10 @@ void loop() {
 
   //Car state
   if (page == "important") {
-    if (killsw == 0 && killsw_temp != 0) {
-      Serial1.print("t9.txt=\"CAR OFF\"" + endChar + "t9.pco=63488" + endChar);
-      killsw_temp = 0;
-    } else if (killsw != 0 && killsw_temp == 0) {
+    if (killsw != 0) {
       Serial1.print("t9.txt=\"CAR ON\"" + endChar + "t9.pco=2016" + endChar);
-      killsw_temp = 1;
+    } else {
+      Serial1.print("t9.txt=\"CAR OFF\"" + endChar + "t9.pco=63488" + endChar);
     }
   }
 
@@ -296,12 +313,12 @@ void loop() {
   if (killsw == 0) {
     off_LED();
   } else if (killsw != 0) {
-    if (warning) {
-      warning_LED();
-    } else if (tc > 0) {
+    if (tc != 0) {
       tc_LED();
+    } else if (clutch != 0) {
+      clutch_LED();
     } else {
-      tach_LED(rpm);  
+      tach_LED(rpm);
     }
   }
 }
