@@ -36,6 +36,7 @@ int t = 0;      //F
 int fp = 0;     //dpsi
 int op = 0;     //dpsi
 int batt = 0;   //dV
+int tc = 0;
 
 int modeTC = 0; //#
 int whlslp = 0; //km/h
@@ -84,7 +85,14 @@ static void off_LED() {
 }
 
 static void warning_LED() {
-  
+  for (int i = 0; i < NUMPIXELS; i++) {
+    if (millis() % 200 > 100) {
+      pixels.setPixelColor(i, pixels.Color(255, 0, 0))
+    } else {
+      pixels.setPixelColor(i, pixels.Color(0, 0, 0))
+    }
+  }
+  pixels.show();
 }
 
 static void tach_LED(int rev) {
@@ -92,7 +100,7 @@ static void tach_LED(int rev) {
 
   //Above limit
   if (rev > rpm_max) {
-    for (i = 0; i < NUMPIXELS; i++) {
+    for (int i = 0; i < NUMPIXELS; i++) {
       if (millis() % 100 > 50) {
         pixels.setPixelColor(i, pixels.Color(255, 0, 0));
       } else {
@@ -112,6 +120,17 @@ static void tach_LED(int rev) {
       } else {
         pixels.setPixelColor(i, pixels.Color(0, 0, 0));
       }
+    }
+  }
+  pixels.show();
+}
+
+static void tc_LED() {
+  for (int i = 0; i < NUMPIXELS; i++) {
+    if (millis() % 100 > 50) {
+      pixels.setPixelColor(i, pixels.Color(0, 255, 0))
+    } else {
+      pixels.setPixelColor(i, pixels.Color(0, 0, 0))
     }
   }
   pixels.show();
@@ -165,6 +184,7 @@ void loop() {
         break;
       case 0x53:
         rpm = (buf[1] * 256 + buf[0]);
+        tc = 0
         break;
     }
   }
@@ -276,7 +296,13 @@ void loop() {
   if (killsw == 0) {
     off_LED();
   } else if (killsw != 0) {
-    tach_LED(rpm);
+    if (warning) {
+      warning_LED();
+    } else if (tc > 0) {
+      tc_LED();
+    } else {
+      tach_LED(rpm);  
+    }
   }
 }
 
