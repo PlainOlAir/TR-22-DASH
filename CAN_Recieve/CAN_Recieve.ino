@@ -1,7 +1,7 @@
 /*
    0x50 - Temp[01]    GPS Speed[23]   Lap Time[4567]
    0x51 - Kill Sw[01] Volt[23]        N/O[4567]
-   0x52 - Oil P[01]   Fuel P[23]      N/O[4567]
+   0x52 - Oil P[01]   Fuel P[23]      TC Lvl[45]      N/O[67]
    0x53 - RPM[01]     Wheel Slip[23]  TC[45]          Clutch[67]
 
    Temp (F)     -> F
@@ -36,6 +36,7 @@ int t = 0;      //F
 int fp = 0;     //dpsi
 int op = 0;     //dpsi
 int batt = 0;   //dV
+int tc_lvl = 0; //hm/h
 int tc = 0;     //#
 int clutch = 0; //#
 
@@ -45,7 +46,7 @@ int whlslp = 0; //km/h
 int killsw = 0; //#
 
 //Warning values
-int t_high = 2120;    //F
+int t_high = 2120;  //F
 int fp_low = 350;   //dpsi
 int op_low = 100;   //dpsi
 int batt_low = 120; //dV
@@ -93,7 +94,7 @@ static void tc_LED() {
 }
 
 static void clutch_LED() {
-  int current_step = floor( (millis() % 700) / (700/7));
+  int current_step = floor( (millis() % 700) / (700 / 7));
 
   for (int i = 0; i < NUMPIXELS; i++) {
     pixels.setPixelColor(i, pixels.Color(0, 0, 0));
@@ -118,9 +119,9 @@ static void tach_LED(int rev) {
         pixels.setPixelColor(i, pixels.Color(0, 0, 255));
       }
     }
-    
+
     //Below limit
-  } else {  
+  } else {
     for (i = 0; i < NUMPIXELS; i++) {
       if (i < current_step) {
         if (i < 8) {
@@ -165,7 +166,7 @@ void loop() {
   uint8_t len;
   uint8_t buf[8];
   uint8_t i;
-  
+
   ret = can.readMsgBuf(&id, &len, buf);
 
   //Get CAN data
@@ -181,6 +182,8 @@ void loop() {
       case 0x52:
         op = (buf[1] * 256 + buf[0]);
         fp = (buf[3] * 256 + buf[2]);
+        tc_lvl = (buf[5] * 256 + buf[4]);
+        tc_lvl = tc_lvl = 5 - round((tc_lvl - 347) / 16);
         break;
       case 0x53:
         rpm = (buf[1] * 256 + buf[0]);
@@ -204,7 +207,15 @@ void loop() {
     Serial1.print("ecuop.val=" + String(op) + endChar);
     Serial1.print("ecufp.val=" + String(fp) + endChar);
     Serial1.print("rpm.val=" + String(rpm) + endChar);
-    
+
+    if (tc_lvl < -10) {
+      Serial1.print("tc.txt=\"OFF\"" + endChar);
+    } else if (tc_lvl <= 0) {
+      Serial1.print("tc.txt=\"1\"" + endChar);
+    } else {
+      Serial1.print("tc.txt=\"" + String(tc_lvl) + "\"" + endChar);
+    }
+
     if (tc != 0) {
       Serial1.print("t5.bco=8160" + endChar + "t5.pco=63515" + endChar);
     } else {
@@ -214,7 +225,7 @@ void loop() {
     if (clutch != 0) {
       Serial1.print("t6.bco=8160" + endChar + "t6.pco=63515" + endChar);
     } else {
-      Serial1.print("t6.bco=0" + endChar + "t6.pco=65535" + endChar);      
+      Serial1.print("t6.bco=0" + endChar + "t6.pco=65535" + endChar);
     }
 
   }
@@ -244,7 +255,7 @@ void loop() {
       page = "lowbatt";
       Serial1.print("page lowbatt");
     }
-    if(warning){
+    if (warning) {
       Serial1.print(endChar);
       delay(100);
     }
@@ -289,7 +300,7 @@ void loop() {
     }
     Serial1.print(endChar);
     delay(100);
-    if(page == "important"){
+    if (page == "important") {
       Serial1.print("hight.val=" + String(t_high) + endChar + "lowfp.val=" + String(fp_low) + endChar + "lowop.val=" + String(op_low) + endChar + "lowbatt.val=" + String(batt_low) + endChar);
     }
   }
