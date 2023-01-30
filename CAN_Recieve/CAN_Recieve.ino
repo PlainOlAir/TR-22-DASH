@@ -1,34 +1,13 @@
 /*
-   0x50 - Temp[01]    GPS Speed[23]   Lap Time[4567]
-   0x51 - Kill Sw[01] Volt[23]        N/O[4567]
-   0x52 - Oil P[01]   Fuel P[23]      TC Lvl[45]      N/O[67]
-   0x53 - RPM[01]     Wheel Slip[23]  TC[45]          Clutch[67]
-
-   Temp (F)     -> F
-   RPM (#)      -> #
-   Oil P(psi)   -> psi ??
-   Fuel P(psi)  -> psi ??
-*/
-
-/*
-   To-do:
-   Make screen more general so arduino code only needs to be adjusted
-   Find default units from PDM to update code and nextion
+   0x50 - Temp[01]    Lap Num[23]   Lap Time[4567]
+   0x51 - Kill Sw[01] Volt[23]      Clutch[45]      GPS Sats Num[67]
+   0x52 - Oil P[01]   Fuel P[23]    TC Lvl[45]      N/O[67]
+   0x53 - RPM[01]     GPS Spd[23]   TC[45]          N/O[67]
 */
 
 //CANbus setup
 #include <same51_can.h>
 SAME51_CAN can;
-
-//LED Strip setup
-#include <Adafruit_NeoPixel.h>
-const int PIN = 4;
-const int NUMPIXELS = 14;
-Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
-const int rpm_max = 9000;
-const int rpm_min = 1000;
-const int rpm_rng = rpm_max - rpm_min;
-const int rpm_step = (rpm_rng) / NUMPIXELS;
 
 //Data values
 int rpm = 0;    //#
@@ -36,6 +15,7 @@ int t = 0;      //F
 int fp = 0;     //dpsi
 int op = 0;     //dpsi
 int batt = 0;   //dV
+int spd = 0;    //hm/h
 int tc_lvl = 0; //hm/h
 int tc = 0;     //#
 int clutch = 0; //#
@@ -60,7 +40,6 @@ int battwarntime = 0;
 bool warning = false;
 
 //Button logic
-int button_temp = 0;
 int button_time = 0;
 int button_depress = 500;
 
@@ -72,6 +51,16 @@ int i = 0;
 int killsw_temp = 0;
 int starttime = millis();
 const int logotime = 7000;
+
+//LED Strip setup
+#include <Adafruit_NeoPixel.h>
+const int PIN = 4;
+const int NUMPIXELS = 14;
+Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
+const int rpm_max = 9000;
+const int rpm_min = 1000;
+const int rpm_rng = rpm_max - rpm_min;
+const int rpm_step = (rpm_rng) / NUMPIXELS;
 
 static void off_LED() {
   if (millis() % 1500 > 750) {
