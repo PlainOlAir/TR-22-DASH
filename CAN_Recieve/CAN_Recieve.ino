@@ -3,6 +3,9 @@
    0x51 - Kill Sw[01] Volt[23]      Clutch[45]      GPS Sats Num[67]
    0x52 - Oil P[01]   Fuel P[23]    TC Lvl[45]      N/O[67]
    0x53 - RPM[01]     GPS Spd[23]   TC[45]          N/O[67]
+
+   Max BP: 200bar
+   Min BP: 45bar
 */
 
 //CANbus setup
