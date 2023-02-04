@@ -139,7 +139,7 @@ static void tach_LED(int rev) {
 void setup() {
   pixels.begin();
 
-  Serial1.begin(115200);
+  Serial1.begin(57600);
   while (!Serial1);
 
   uint8_t ret;
@@ -153,7 +153,6 @@ void setup() {
 }
 
 void loop() {
-
   uint8_t ret;
   uint32_t id;
   uint8_t len;
@@ -215,7 +214,7 @@ void loop() {
       }
       diag = 2;
 
-      if (t <= 2120) {
+      if (nsats >= 4) {
         Serial1.print("c1.pco=2016" + endChar);
       } else {
         Serial1.print("c1.pco=63488" + endChar);
@@ -230,7 +229,7 @@ void loop() {
       }
       diag = 3;
 
-      if (nsats >= 4) {
+      if (t <= 2120) {
         Serial1.print("c2.pco=2016" + endChar);
       } else {
         Serial1.print("c2.pco=63488" + endChar);
