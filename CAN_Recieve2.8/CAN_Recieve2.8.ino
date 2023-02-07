@@ -70,7 +70,7 @@ int diag = 0;
 int i = 0;
 int starttime = 0;
 const int diagnostictime = 7000;
-const int logotime = 10000;
+const int logotime = 5000;
 
 static void off_LED() {
   if (millis() % 1500 > 750) {
@@ -139,7 +139,7 @@ static void tach_LED(int rev) {
 void setup() {
   pixels.begin();
 
-  Serial1.begin(57600);
+  Serial1.begin(115200);
   while (!Serial1);
 
   uint8_t ret;
