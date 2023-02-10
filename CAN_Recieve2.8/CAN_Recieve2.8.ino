@@ -38,8 +38,8 @@ const int rpm_rng = rpm_max - rpm_min;
 const int rpm_step = (rpm_rng) / NUMPIXELS;
 
 //Brake Pressure
-const int brakep_max = 2500;
-const int brakep_min = 800;
+const float brakep_max = 2500;
+const float brakep_min = 100;
 
 //Warning values
 int t_high = 2120;  //F
@@ -68,12 +68,12 @@ String diag1 = "GPS SIGNAL";
 String diag2 = "ENGINE TEMPERATURE";
 int diag = 0;
 int i = 0;
-int starttime = 0;
-const int diagnostictime = 7000;
-const int logotime = 5000;
+int reftime = 0;
+const int diagnostictime = 3000;
+const int logotime = 4000;
 
 static void off_LED() {
-  if (millis() % 1500 > 750) {
+  if (millis() % 2000 > 1000) {
     for (int i = 0; i < NUMPIXELS; i++) {
       pixels.setPixelColor(i, pixels.Color(0, 0, 0));
     }
@@ -93,7 +93,7 @@ static void tc_LED() {
 }
 
 static void clutch_LED() {
-  int current_step = floor( (millis() % 700) / (700 / 7));
+  int current_step = floor( (millis() % 600) / (600 / 7));
 
   for (int i = 0; i < NUMPIXELS; i++) {
     pixels.setPixelColor(i, pixels.Color(0, 0, 0));
@@ -148,8 +148,6 @@ void setup() {
   delay(1000);
   Serial1.print("page diagnostics" + endChar);
   page = "diagnostics";
-  delay(500);
-  starttime = millis();
 }
 
 void loop() {
@@ -172,12 +170,15 @@ void loop() {
         t = (buf[1] * 256 + buf[0]);
         batt = (buf[3] * 256 + buf[2]);
         tc_lvl = (buf[5] * 256 + buf[4]);
+        tc_lvl = 5 - round((tc_lvl - 347) / 16);
         break;
       case 0x52:
         op = (buf[1] * 256 + buf[0]);
         fp = (buf[3] * 256 + buf[2]);
         pedpos = (buf[5] * 256 + buf[4]);
         brakep = (buf[7] * 256 + buf[6]);
+        pedpos = round(pedpos / 10.0);
+        brakep = ((brakep - brakep_min) / (brakep_max - brakep_min)) * 100;
         break;
       case 0x53:
         rpm = (buf[1] * 256 + buf[0]);
@@ -186,18 +187,17 @@ void loop() {
         break;
       case 0x54:
         nsats = (buf[7] * 256 + buf[6]);
-      break;
+        break;
     }
   }
 
   if (diag < 4) {
     if (diag == 0) {
       Serial1.print("c0.pco=0" + endChar);
-      for(i = 0; i < diag0.length() + 1; i++) {
-        Serial1.print("t0.txt=\"" + diag0.substring(0,i) + "\"" + endChar);
-        delay(50);        
+      for (i = 0; i < diag0.length() + 1; i++) {
+        Serial1.print("t0.txt=\"" + diag0.substring(0, i) + "\"" + endChar);
+        delay(50);
       }
-      diag = 1;
 
       if (batt >= 120) {
         Serial1.print("c0.pco=2016" + endChar);
@@ -205,29 +205,31 @@ void loop() {
         Serial1.print("c0.pco=63488" + endChar);
       }
 
+      diag = 1;
+
     } else if (diag == 1) {
       delay(300);
       Serial1.print("c1.pco=0" + endChar);
-      for(i = 0; i < diag1.length() + 1; i++) {
-        Serial1.print("t1.txt=\"" + diag1.substring(0,i) + "\"" + endChar);
-        delay(50);        
+      for (i = 0; i < diag1.length() + 1; i++) {
+        Serial1.print("t1.txt=\"" + diag1.substring(0, i) + "\"" + endChar);
+        delay(50);
       }
-      diag = 2;
 
       if (nsats >= 4) {
         Serial1.print("c1.pco=2016" + endChar);
       } else {
         Serial1.print("c1.pco=63488" + endChar);
       }
-      
+
+      diag = 2;
+
     } else if (diag == 2) {
       delay(300);
       Serial1.print("c2.pco=0" + endChar);
-      for(i = 0; i < diag2.length() + 1; i++) {
-        Serial1.print("t2.txt=\"" + diag2.substring(0,i) + "\"" + endChar);
-        delay(50);        
+      for (i = 0; i < diag2.length() + 1; i++) {
+        Serial1.print("t2.txt=\"" + diag2.substring(0, i) + "\"" + endChar);
+        delay(50);
       }
-      diag = 3;
 
       if (t <= 2120) {
         Serial1.print("c2.pco=2016" + endChar);
@@ -235,8 +237,31 @@ void loop() {
         Serial1.print("c2.pco=63488" + endChar);
       }
 
+      reftime = millis();
+      diag = 3;
+
     } else if (diag == 3) {
-      delay(2000);
+
+      if (diagnostictime > millis() - reftime) {
+        if (batt >= 120) {
+          Serial1.print("c0.pco=2016" + endChar);
+        } else {
+          Serial1.print("c0.pco=63488" + endChar);
+        }
+        if (nsats >= 4) {
+          Serial1.print("c1.pco=2016" + endChar);
+        } else {
+          Serial1.print("c1.pco=63488" + endChar);
+        }
+        if (t <= 2120) {
+          Serial1.print("c2.pco=2016" + endChar);
+        } else {
+          Serial1.print("c2.pco=63488" + endChar);
+        }
+        delay(50);
+        return;
+      }
+
       Serial1.print("page logo" + endChar);
       page = "logo";
       delay(logotime);
@@ -244,13 +269,12 @@ void loop() {
       page = "important";
       diag = 4;
     }
+    
     return;
   }
 
   //Update values in each page
   if (page == "important") {
-    pedpos = round(pedpos/10.0);
-    brakep = (brakep - brakep_min) / (brakep_max - brakep_min);   
     Serial1.print("ecut.val=" + String(t) + endChar);
     Serial1.print("ecubatt.val=" + String(batt) + endChar);
     Serial1.print("ecuop.val=" + String(op) + endChar);
@@ -260,7 +284,7 @@ void loop() {
     Serial1.print("brakepos.val=" + String(brakep) + endChar);
 
   } else if (page == "race") {
-    tc_lvl = tc_lvl = 5 - round((tc_lvl - 347) / 16);
+
     Serial1.print("ecut.val=" + String(t) + endChar);
     Serial1.print("ecubatt.val=" + String(batt) + endChar);
     Serial1.print("ecuop.val=" + String(op) + endChar);
@@ -315,7 +339,7 @@ void loop() {
         lastpage = page;
         page = "lowbatt";
         Serial1.print("page lowbatt");
-      }      
+      }
       if (warning) {
         Serial1.print(endChar);
         delay(100);
@@ -324,7 +348,7 @@ void loop() {
       if (millis() % 1500 > 750) {
         if (t > t_high) {
           Serial1.print("ecut.bco=63488" + endChar);
-        }        
+        }
         if (fp < fp_low) {
           Serial1.print("ecufp.bco=63488" + endChar);
         }
@@ -339,13 +363,13 @@ void loop() {
         Serial1.print("ecufp.bco=0" + endChar);
         Serial1.print("ecuop.bco=0" + endChar);
         Serial1.print("ecubatt.bco=0" + endChar);
-      }      
+      }
     }
-    
+
   }
 
   //Screen switch/Ack
-  if (analogRead(A2) >= 700 && millis() - button_time > button_depress) {
+  if (analogRead(A2) >= 500 && millis() - button_time > button_depress) {
     button_time = millis();
 
     if (page == "important") {
